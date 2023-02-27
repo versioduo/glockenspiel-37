@@ -17,6 +17,48 @@ static V2LED::WS2812 LEDExt(37, PIN_LED_WS2812_EXT, &sercom1, SPI_PAD_0_SCK_1, P
 static V2MIDI::SerialDevice MIDISerial(&SerialMIDI);
 static V2Link::Port Socket(&SerialSocket, PIN_SERIAL_SOCKET_TX_ENABLE);
 
+// The button switches the state with a multi-click long-press.
+static class Manual {
+public:
+  enum class Mode { Notes, Song, Test, Tune, Turn } mode{};
+  Mode getMode() const {
+    return _mode;
+  }
+
+  void setMode(Mode mode, float color = 0) {
+    _mode = mode;
+
+    switch (_mode) {
+      case Mode::Notes:
+        LED.reset();
+        LED.setHSV(color, 1, 0.25);
+        break;
+
+      case Mode::Song:
+        LED.reset();
+        LED.setBrightness(0.25);
+        break;
+
+      case Mode::Test:
+        LED.reset();
+        LED.rainbow(1, 3, 0.4);
+        break;
+    }
+  }
+
+  void setColor(V2Color::Hue color) {
+    LED.reset();
+    LED.setHSV(color, 1, 0.25);
+  }
+
+  void splashColor(V2Color::Hue color) {
+    LED.splashHSV(0.5, color, 1, 0.25);
+  }
+
+private:
+  Mode _mode{};
+} Manual;
+
 static class Device : public V2Device {
 public:
   Device() : V2Device() {
@@ -81,7 +123,17 @@ public:
 
   void setProgram(Program number) {
     _program = number;
-    LED.setHSV(_programs[(uint8_t)_program].color, 1, 0.25);
+
+    switch (Manual.getMode()) {
+      case Manual::Mode::Notes:
+        Manual.setColor(_programs[(uint8_t)_program].color);
+        break;
+
+      case Manual::Mode::Song:
+      case Manual::Mode::Test:
+        Manual.splashColor(_programs[(uint8_t)_program].color);
+        break;
+    }
   }
 
   void setSustain(uint8_t value) {
@@ -106,7 +158,7 @@ public:
     if (note < notes.start || note > (notes.start + notes.count - 1))
       return;
 
-    _lastUsec     = micros();
+    _lastUsec     = V2Base::getUsec();
     uint8_t index = note - notes.start;
 
     // Ignore the note when the same note with a higher priority is already playing.
@@ -157,8 +209,7 @@ public:
       _notesPriority[i].reset();
     }
 
-    LED.reset();
-    LED.setHSV(_programs[(uint8_t)_program].color, 1, 0.25);
+    Manual.setMode(Manual::Mode::Notes, _programs[(uint8_t)_program].color);
     LEDExt.reset();
 
     for (uint8_t i = 0; i < 1 + (notes.count / 8); i++) {
@@ -173,7 +224,7 @@ private:
   V2Music::ForcedStop _force;
 
   // Reset all notes after a timeout.
-  unsigned long _lastUsec{};
+  uint32_t _lastUsec{};
 
   // LED color.
   struct {
@@ -183,11 +234,11 @@ private:
   } _led{};
 
   // Calibration mode LED flash.
-  unsigned long _flashUsec{};
+  uint32_t _flashUsec{};
 
   const struct {
     const char *name;
-    float color;
+    V2Color::Hue color;
   } _programs[(uint8_t)Program::_count]{
     [(uint8_t)Program::Standard]      = {.name{"Standard"}, .color{V2Color::Orange}},
     [(uint8_t)Program::Damper]        = {.name{"Damper"}, .color{V2Color::Cyan}},
@@ -203,7 +254,7 @@ private:
   float _rainbow{};
 
   struct {
-    unsigned long startUsec;
+    uint32_t startUsec;
     bool playing;
   } _notes[notes.count]{};
 
@@ -239,8 +290,7 @@ private:
       _notesPriority[i].reset();
     }
 
-    LED.reset();
-    LED.setHSV(_programs[(uint8_t)_program].color, 1, 0.25);
+    Manual.setMode(Manual::Mode::Notes, _programs[(uint8_t)_program].color);
     LEDExt.reset();
 
     for (uint8_t i = 0; i < 1 + (notes.count / 8); i++) {
@@ -253,13 +303,13 @@ private:
 
   void handleLoop() override {
     // Reset calibration flash.
-    if (_flashUsec > 0 && (unsigned long)(micros() - _flashUsec) > 100 * 1000) {
+    if (_flashUsec > 0 && V2Base::getUsecSince(_flashUsec) > 100 * 1000) {
       _flashUsec = 0;
       LEDExt.reset();
     }
 
     // Reset all playing notes when idle.
-    if (_lastUsec > 0 && (unsigned long)(micros() - _lastUsec) > 30 * 1000 * 1000) {
+    if (_lastUsec > 0 && V2Base::getUsecSince(_lastUsec) > 30 * 1000 * 1000) {
       _lastUsec = 0;
       allNotesOff();
     }
@@ -267,7 +317,7 @@ private:
 
   void flash(uint8_t note) {
     LEDExt.setHSV(note, V2Color::Magenta, 0.8, 1);
-    _flashUsec = micros();
+    _flashUsec = V2Base::getUsec();
   }
 
   void light(uint8_t note, float fraction) {
@@ -283,7 +333,7 @@ private:
 
   // Seconds since the note is running.
   float getTriggerDuration(uint8_t index) {
-    return (float)(unsigned long)(micros() - _notes[index].startUsec) / (1000 * 1000);
+    return (float)V2Base::getUsecSince(_notes[index].startUsec) / (1000.f * 1000.f);
   }
 
   // The pulse controllers are connected in reversed order.
@@ -393,7 +443,7 @@ private:
       getPulse(fraction, watts, seconds);
 
       // Record the time to decide if we need to damp the triggered note at NoteOff.
-      _notes[index].startUsec = micros();
+      _notes[index].startUsec = V2Base::getUsec();
 
       sendTrigger(index, watts, seconds);
       _notes[index].playing = true;
@@ -786,25 +836,12 @@ public:
   MIDIFile() : V2MIDI::File::Tracks(MIDISong) {}
   bool handleSend(uint16_t track, V2MIDI::Packet *packet) {
     Device.dispatch(&Device.usb.midi, packet);
-
-    if (packet->getType() != V2MIDI::Packet::Status::NoteOn)
-      return true;
-
-    if (packet->getNoteVelocity() == 0)
-      return true;
-
-    Device.led.flash(0.03, 0.3);
     return true;
   }
 
   void handleStateChange(V2MIDI::File::Tracks::State state) {
     switch (state) {
-      case V2MIDI::File::Tracks::State::Play:
-        Device.reset();
-        LED.setBrightness(0.2);
-        break;
-
-      case V2MIDI::File::Tracks::State::Ready:
+      case V2MIDI::File::Tracks::State::Stop:
         Device.reset();
         break;
     }
@@ -836,15 +873,14 @@ public:
   }
 
   void play() {
-    Device.reset();
+    LEDExt.reset();
     LEDExt.rainbow(2, 2, 1);
-    LED.rainbow(1, 3, 0.4);
-    _resetUsec = micros();
 
-    _enabled  = true;
-    _velocity = config.min;
-    _note     = 0;
-    _usec     = 0;
+    _resetUsec = V2Base::getUsec();
+    _enabled   = true;
+    _velocity  = config.min;
+    _note      = 0;
+    _usec      = 0;
   }
 
   void loop() {
@@ -858,22 +894,22 @@ private:
   bool _enabled{};
   uint8_t _velocity{};
   uint8_t _note{};
-  unsigned long _usec{};
-  unsigned long _resetUsec{};
+  uint32_t _usec{};
+  uint32_t _resetUsec{};
 
   void playNote() {
     if (_resetUsec > 0) {
       // Wait for the controllers to initialize after a reset.
-      if ((unsigned long)(micros() - _resetUsec) < 500 * 1000)
+      if (V2Base::getUsecSince(_resetUsec) < 500 * 1000)
         return;
 
       _resetUsec = 0;
     }
 
-    if ((unsigned long)(micros() - _usec) < 180 * 1000)
+    if (V2Base::getUsecSince(_usec) < 200 * 1000)
       return;
 
-    _usec = micros();
+    _usec = V2Base::getUsec();
 
     if (_note == 0) {
       _note = Device::notes.start;
@@ -888,10 +924,8 @@ private:
       _note = 0;
 
       _velocity += config.step;
-      if (_velocity > 127) {
-        Device.reset();
-        _enabled = false;
-      }
+      if (_velocity > 127)
+        stop();
     }
   }
 } TestMode;
@@ -920,10 +954,14 @@ private:
   void handleHold(uint8_t count) override {
     switch (count) {
       case 0:
+        Device.reset();
+        Manual.setMode(Manual::Mode::Song);
         MIDIFile.play();
         break;
 
       case 1:
+        Device.reset();
+        Manual.setMode(Manual::Mode::Test);
         TestMode.play();
         break;
     }
@@ -967,9 +1005,17 @@ void loop() {
   MIDI.loop();
   Link.loop();
   V2Buttons::loop();
-  TestMode.loop();
-  MIDIFile.loop();
   Device.loop();
+
+  switch (Manual.getMode()) {
+    case Manual::Mode::Song:
+      MIDIFile.loop();
+      break;
+
+    case Manual::Mode::Test:
+      TestMode.loop();
+      break;
+  }
 
   if (Link.idle() && Device.idle())
     Device.sleep();
