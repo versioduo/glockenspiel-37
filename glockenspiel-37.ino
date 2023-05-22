@@ -10,7 +10,7 @@
 #include <V2MIDI.h>
 #include <V2Music.h>
 
-V2DEVICE_METADATA("com.versioduo.glockenspiel-37", 62, "versioduo:samd:control");
+V2DEVICE_METADATA("com.versioduo.glockenspiel-37", 63, "versioduo:samd:control");
 
 static V2LED::WS2812 LED(2, PIN_LED_WS2812, &sercom2, SPI_PAD_0_SCK_1, PIO_SERCOM);
 static V2LED::WS2812 LEDExt(37, PIN_LED_WS2812_EXT, &sercom1, SPI_PAD_0_SCK_1, PIO_SERCOM);
@@ -82,12 +82,12 @@ public:
   }
 
   enum class CC {
-    Volume     = V2MIDI::CC::ChannelVolume,
-    Sustain    = V2MIDI::CC::Sustain,
-    Color      = V2MIDI::CC::Controller14,
-    Saturation = V2MIDI::CC::Controller15,
-    Brightness = V2MIDI::CC::Controller89,
-    Rainbow    = V2MIDI::CC::Controller90,
+    Volume       = V2MIDI::CC::ChannelVolume,
+    SustainPedal = V2MIDI::CC::SustainPedal,
+    Color        = V2MIDI::CC::Controller14,
+    Saturation   = V2MIDI::CC::Controller15,
+    Brightness   = V2MIDI::CC::Controller89,
+    Rainbow      = V2MIDI::CC::Controller90,
   };
 
   // 37 notes, C4 - C7. The Middle C is C3.
@@ -551,7 +551,7 @@ private:
         allNotesOff();
         return;
 
-      case (uint8_t)CC::Sustain:
+      case (uint8_t)CC::SustainPedal:
         if (!_sustainPriority.set(value == 0 ? -1 : value, channel))
           return;
 
@@ -742,8 +742,8 @@ private:
     }
     {
       JsonObject jsonController = jsonControllers.createNestedObject();
-      jsonController["name"]    = "Sustain";
-      jsonController["number"]  = (uint8_t)CC::Sustain;
+      jsonController["name"]    = "Sustain Pedal";
+      jsonController["number"]  = (uint8_t)CC::SustainPedal;
       jsonController["value"]   = _sustain;
     }
     {
