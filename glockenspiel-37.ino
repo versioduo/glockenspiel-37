@@ -10,7 +10,7 @@
 #include <V2MIDI.h>
 #include <V2Music.h>
 
-V2DEVICE_METADATA("com.versioduo.glockenspiel-37", 63, "versioduo:samd:control");
+V2DEVICE_METADATA("com.versioduo.glockenspiel-37", 64, "versioduo:samd:control");
 
 static V2LED::WS2812 LED(2, PIN_LED_WS2812, &sercom2, SPI_PAD_0_SCK_1, PIO_SERCOM);
 static V2LED::WS2812 LEDExt(37, PIN_LED_WS2812_EXT, &sercom1, SPI_PAD_0_SCK_1, PIO_SERCOM);
@@ -61,7 +61,7 @@ private:
 
 static class Device : public V2Device {
 public:
-  Device() : V2Device() {
+  constexpr Device() : V2Device() {
     metadata.vendor      = "Versio Duo";
     metadata.product     = "V2 glockenspiel-37";
     metadata.description = "37 Bar Glockenspiel";
@@ -810,7 +810,9 @@ private:
 // Dispatch Link packets.
 static class Link : public V2Link {
 public:
-  Link() : V2Link(NULL, &Socket) {}
+  constexpr Link() : V2Link(NULL, &Socket) {
+    Device.link = this;
+  }
 
 private:
   V2MIDI::Packet _midi{};
@@ -835,7 +837,8 @@ private:
 
 static class MIDIFile : public V2MIDI::File::Tracks {
 public:
-  MIDIFile() : V2MIDI::File::Tracks(MIDISong) {}
+  constexpr MIDIFile() : V2MIDI::File::Tracks(MIDISong) {}
+
   bool handleSend(uint16_t track, V2MIDI::Packet *packet) {
     Device.dispatch(&Device.usb.midi, packet);
     return true;
@@ -934,7 +937,7 @@ private:
 
 static class Button : public V2Buttons::Button {
 public:
-  Button(uint8_t pin) : V2Buttons::Button(&_config, pin) {}
+  constexpr Button(uint8_t pin) : V2Buttons::Button(&_config, pin) {}
 
 private:
   const V2Buttons::Config _config{.clickUsec{200 * 1000}, .holdUsec{500 * 1000}};
@@ -986,10 +989,7 @@ void setup() {
   for (uint8_t i = 0; i < V2Base::countof(Buttons); i++)
     Buttons[i].begin();
 
-  // Plug.begin();
-  Socket.begin();
-  Device.link   = &Link;
-  Device.serial = &MIDISerial;
+  Link.begin();
 
   // Set the SERCOM interrupt priority, it requires a stable ~300 kHz interrupt
   // frequency. This needs to be after begin().
@@ -997,6 +997,7 @@ void setup() {
 
   SerialMIDI.begin(31250);
   SerialMIDI.setTimeout(1);
+  Device.serial = &MIDISerial;
 
   Device.reset();
 }
