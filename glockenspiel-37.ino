@@ -10,7 +10,7 @@
 #include <V2MIDI.h>
 #include <V2Music.h>
 
-V2DEVICE_METADATA("com.versioduo.glockenspiel-37", 66, "versioduo:samd:control");
+V2DEVICE_METADATA("com.versioduo.glockenspiel-37", 67, "versioduo:samd:control");
 
 static V2LED::WS2812 LED(2, PIN_LED_WS2812, &sercom2, SPI_PAD_0_SCK_1, PIO_SERCOM);
 static V2LED::WS2812 LEDExt(37, PIN_LED_WS2812_EXT, &sercom1, SPI_PAD_0_SCK_1, PIO_SERCOM);
@@ -154,11 +154,11 @@ public:
     }
   }
 
-  void play(uint8_t channel, uint8_t note, uint8_t velocity, uint8_t offVelocity = 0) {
+  void play(uint8_t channel, uint8_t note, uint8_t velocity) {
     if (note < notes.start || note > (notes.start + notes.count - 1))
       return;
 
-    _lastUsec     = V2Base::getUsec();
+    touchTimeout();
     uint8_t index = note - notes.start;
 
     // Ignore the note when the same note with a higher priority is already playing.
@@ -167,11 +167,7 @@ public:
 
     switch (_channels[channel].program) {
       case Program::Standard:
-        if (velocity > 0)
-          playStandardOn(channel, index, velocity);
-
-        else
-          playStandardOff(channel, index, offVelocity);
+        playStandard(channel, index, velocity);
         break;
 
       case Program::Damper:
@@ -207,11 +203,10 @@ public:
 private:
   V2Music::ForcedStop _force;
 
-  // Reset all notes after a timeout.
-  uint32_t _lastUsec{};
-
-  // Calibration mode LED flash.
-  uint32_t _flashUsec{};
+  struct {
+    uint32_t usec{};
+    bool notes{};
+  } _timeout;
 
   uint8_t _volume{100};
   uint8_t _sustain{};
@@ -258,10 +253,43 @@ private:
     }
   }
 
+  void touchTimeout() {
+    _timeout.usec  = V2Base::getUsec();
+    _timeout.notes = true;
+  }
+
+  void runTimeout() {
+    if (_timeout.usec == 0)
+      return;
+
+    if (V2Base::getUsecSince(_timeout.usec) < 30 * 1000 * 1000)
+      return;
+
+    if (_timeout.notes) {
+      resetNotes();
+      _timeout.notes = false;
+    }
+
+    if (V2Base::getUsecSince(_timeout.usec) < 900 * 1000 * 1000)
+      return;
+
+    allNotesOff();
+    _timeout.usec = 0;
+  }
+
+  void resetNotes() {
+    for (uint8_t i = 0; i < notes.count; i++) {
+      _notes[i] = {};
+      _notesPriority[i].reset();
+    }
+
+    LEDExt.reset();
+  }
+
   void setDefaultValues() {
-    _lastUsec = 0;
-    _volume   = 100;
-    _sustain  = 0;
+    _timeout = {};
+    _volume  = 100;
+    _sustain = 0;
     _sustainPriority.reset();
     _rainbow = 0;
 
@@ -274,13 +302,8 @@ private:
       _channels[ch].led.v = (float)config.color.v / 127.f;
     }
 
-    for (uint8_t i = 0; i < notes.count; i++) {
-      _notes[i] = {};
-      _notesPriority[i].reset();
-    }
-
     Manual.setMode(Manual::Mode::Notes, _programs[(uint8_t)_channels[0].program].color);
-    LEDExt.reset();
+    resetNotes();
   }
 
   void handleReset() override {
@@ -296,22 +319,7 @@ private:
   }
 
   void handleLoop() override {
-    // Reset calibration flash.
-    if (_flashUsec > 0 && V2Base::getUsecSince(_flashUsec) > 100 * 1000) {
-      _flashUsec = 0;
-      LEDExt.reset();
-    }
-
-    // Reset all playing notes when idle.
-    if (_lastUsec > 0 && V2Base::getUsecSince(_lastUsec) > 30 * 1000 * 1000) {
-      _lastUsec = 0;
-      allNotesOff();
-    }
-  }
-
-  void flash(uint8_t note) {
-    LEDExt.setHSV(note, V2Color::Magenta, 0.8, 1);
-    _flashUsec = V2Base::getUsec();
+    runTimeout();
   }
 
   void light(uint8_t channel, uint8_t note, float fraction) {
@@ -423,7 +431,29 @@ private:
     return powf(fraction, 1 - (0.5f * range));
   }
 
-  void playStandardOn(uint8_t channel, uint8_t index, uint8_t velocity) {
+  void playStandard(uint8_t channel, uint8_t index, uint8_t velocity) {
+    if (velocity == 0) {
+      // Damp only an active tone.
+      if (getTriggerDuration(index) < 4.f) {
+        float watts   = 1.5f + (0.5f * ((float)velocity / 127.f));
+        float seconds = 1.5;
+
+        if (_sustain < 120) {
+          if (_sustain > 0) {
+            const float fraction = (float)_sustain / 127.f;
+            watts -= 0.8f * powf(fraction, 0.5);
+            seconds -= 0.5f * powf(fraction, 0.5);
+          }
+
+          _notes[index].playing = false;
+          sendDamper(index, watts, seconds, true, true);
+        }
+      }
+
+      light(channel, index, 0);
+      return;
+    }
+
     //  Cancel a still active damper.
     sendDamper(index, 0, 0, false, false);
 
@@ -445,70 +475,51 @@ private:
     light(channel, index, (float)velocity / 127.f);
   }
 
-  void playStandardOff(uint8_t channel, uint8_t index, uint8_t velocity) {
-    // Damp only an active tone.
-    if (getTriggerDuration(index) < 4.f) {
-      float watts   = 1.5f + (0.5f * ((float)velocity / 127.f));
-      float seconds = 1.5;
-
-      if (_sustain < 120) {
-        if (_sustain > 0) {
-          const float fraction = (float)_sustain / 127.f;
-          watts -= 0.8f * powf(fraction, 0.5);
-          seconds -= 0.5f * powf(fraction, 0.5);
-        }
-
-        _notes[index].playing = false;
-        sendDamper(index, watts, seconds, true, true);
-      }
+  void playDamper(uint8_t channel, uint8_t index, uint8_t velocity) {
+    if (velocity == 0) {
+      light(channel, index, 0);
+      return;
     }
 
-    light(channel, index, 0);
-  }
+    if (_volume > 0) {
+      float fraction = getFraction(velocity);
+      fraction       = adjustVolume(fraction);
+      sendDamper(index, 1.f + (4.f * fraction), 0.05, false, false);
+    }
 
-  void playDamper(uint8_t channel, uint8_t index, uint8_t velocity) {
-    if (velocity > 0) {
-      if (_volume > 0) {
-        float fraction = getFraction(velocity);
-        fraction       = adjustVolume(fraction);
-        sendDamper(index, 1.f + (4.f * fraction), 0.05, false, false);
-      }
-
-      light(channel, index, (float)velocity / 127.f);
-
-    } else
-      light(channel, index, 0);
+    light(channel, index, (float)velocity / 127.f);
   }
 
   void playDampened(uint8_t channel, uint8_t index, uint8_t velocity) {
-    if (velocity > 0) {
-      if (_volume > 0) {
-        float fraction = getFractionCalibrated(index, velocity);
-        fraction       = adjustVolume(fraction);
-
-        float watts;
-        float seconds;
-        getPulse(fraction, watts, seconds);
-        sendTrigger(index, watts, seconds);
-        sendDamper(index, 2, 0.5, false, true);
-      }
-
-      light(channel, index, (float)velocity / 127.f);
-
-    } else
+    if (velocity == 0) {
       light(channel, index, 0);
+      return;
+    }
+
+    if (_volume > 0) {
+      float fraction = getFractionCalibrated(index, velocity);
+      fraction       = adjustVolume(fraction);
+
+      float watts;
+      float seconds;
+      getPulse(fraction, watts, seconds);
+      sendTrigger(index, watts, seconds);
+      sendDamper(index, 2, 0.5, false, true);
+    }
+
+    light(channel, index, (float)velocity / 127.f);
   }
 
   void playCalibration(uint8_t channel, uint8_t index, uint8_t velocity) {
-    if (velocity == 0)
-      return;
+    if (velocity > 0) {
+      float watts;
+      float seconds;
+      float fraction = getFraction(velocity);
+      getPulse(fraction, watts, seconds);
+      sendTrigger(index, watts, seconds);
+    }
 
-    float fraction = getFraction(velocity);
-    float watts;
-    float seconds;
-    getPulse(fraction, watts, seconds);
-    sendTrigger(index, watts, seconds);
-    flash(index);
+    light(channel, index, (float)velocity / 127.f);
   }
 
   void handleNote(uint8_t channel, uint8_t note, uint8_t velocity) override {
@@ -516,14 +527,12 @@ private:
   }
 
   void handleNoteOff(uint8_t channel, uint8_t note, uint8_t velocity) override {
-    //  Work-around for some devices.
-    if (velocity == 0)
-      velocity = 64;
-
-    play(channel, note, 0, velocity);
+    play(channel, note, 0);
   }
 
   void handleProgramChange(uint8_t channel, uint8_t program) override {
+    touchTimeout();
+
     if (program != V2MIDI::GM::Program::Glockenspiel)
       return;
 
@@ -534,6 +543,8 @@ private:
   }
 
   void handleControlChange(uint8_t channel, uint8_t controller, uint8_t value) override {
+    touchTimeout();
+
     // Controls for a specific channel.
     switch (controller) {
       case V2MIDI::CC::BankSelect:
@@ -926,7 +937,7 @@ private:
       Device.play(0, _note, _velocity);
 
     } else if (_note < Device.notes.start + Device.notes.count - 1) {
-      Device.play(0, _note, 0, 0);
+      Device.play(0, _note, 0);
       _note++;
       Device.play(0, _note, _velocity);
 
