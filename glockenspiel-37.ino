@@ -1,4 +1,4 @@
-// © Kay Sievers <kay@versioduo.com>, 2020-2022
+// © Kay Sievers <kay@versioduo.com>, 2020-2023
 // SPDX-License-Identifier: Apache-2.0
 
 #include "MIDISong.h"
@@ -330,7 +330,7 @@ private:
 
     } else
       LEDExt.setBrightness(note, 0);
-  };
+  }
 
   // Seconds since the note is running.
   float getTriggerDuration(uint8_t index) {
@@ -619,16 +619,16 @@ private:
 
   void exportSettings(JsonArray json) override {
     {
-      JsonObject setting = json.createNestedObject();
+      JsonObject setting = json.add<JsonObject>();
       setting["type"]    = "calibration";
       setting["title"]   = "Calibration";
 
       // Notes are sent on a special program which plays the raw uncalibrated values.
-      JsonObject jsonProgram = setting.createNestedObject("program");
+      JsonObject jsonProgram = setting["program"].to<JsonObject>();
       jsonProgram["number"]  = V2MIDI::GM::Program::Glockenspiel;
       jsonProgram["bank"]    = (uint8_t)Program::Calibration;
 
-      JsonObject jsonChromatic = setting.createNestedObject("chromatic");
+      JsonObject jsonChromatic = setting["chromatic"].to<JsonObject>();
       jsonChromatic["start"]   = notes.start;
       jsonChromatic["count"]   = notes.count;
 
@@ -636,7 +636,7 @@ private:
     }
 
     {
-      JsonObject setting = json.createNestedObject();
+      JsonObject setting = json.add<JsonObject>();
       setting["type"]    = "color";
       setting["title"]   = "Light";
       setting["path"]    = "color";
@@ -645,9 +645,9 @@ private:
 
   void exportConfiguration(JsonObject json) override {
     json["#calibration"]      = "The “Raw” velocity values to play a note with velocity 1 and 127";
-    JsonArray jsonCalibration = json.createNestedArray("calibration");
+    JsonArray jsonCalibration = json["calibration"].to<JsonArray>();
     for (uint8_t i = 0; i < notes.count; i++) {
-      JsonObject note = jsonCalibration.createNestedObject();
+      JsonObject note = jsonCalibration.add<JsonObject>();
       uint8_t min     = config.calibration[i].min;
       uint8_t max     = config.calibration[i].max;
 
@@ -664,7 +664,7 @@ private:
 
     {
       json["#color"]    = "The LED color. Hue, saturation, brightness, 0..127";
-      JsonArray jsonLed = json.createNestedArray("color");
+      JsonArray jsonLed = json["color"].to<JsonArray>();
       jsonLed.add(config.color.h);
       jsonLed.add(config.color.s);
       jsonLed.add(config.color.v);
@@ -729,14 +729,14 @@ private:
   }
 
   void exportInput(JsonObject json) override {
-    JsonArray jsonChannels = json.createNestedArray("channels");
+    JsonArray jsonChannels = json["channels"].to<JsonArray>();
     for (uint8_t ch = 0; ch < 16; ch++) {
-      JsonObject jsonChannel = jsonChannels.createNestedObject();
+      JsonObject jsonChannel = jsonChannels.add<JsonObject>();
       jsonChannel["number"]  = ch;
 
-      JsonArray jsonPrograms = jsonChannel.createNestedArray("programs");
+      JsonArray jsonPrograms = jsonChannel["programs"].to<JsonArray>();
       for (uint8_t i = 0; i < (uint8_t)Program::_count; i++) {
-        JsonObject jsonProgram = jsonPrograms.createNestedObject();
+        JsonObject jsonProgram = jsonPrograms.add<JsonObject>();
         jsonProgram["name"]    = _programs[i].name;
         jsonProgram["number"]  = V2MIDI::GM::Program::Glockenspiel;
         jsonProgram["bank"]    = i;
@@ -744,16 +744,16 @@ private:
           jsonProgram["selected"] = true;
       }
 
-      JsonArray jsonControllers = jsonChannel.createNestedArray("controllers");
+      JsonArray jsonControllers = jsonChannel["controllers"].to<JsonArray>();
       if (ch == 0) {
         {
-          JsonObject jsonController = jsonControllers.createNestedObject();
+          JsonObject jsonController = jsonControllers.add<JsonObject>();
           jsonController["name"]    = "Volume";
           jsonController["number"]  = (uint8_t)CC::Volume;
           jsonController["value"]   = _volume;
         }
         {
-          JsonObject jsonController = jsonControllers.createNestedObject();
+          JsonObject jsonController = jsonControllers.add<JsonObject>();
           jsonController["name"]    = "Sustain Pedal";
           jsonController["number"]  = (uint8_t)CC::SustainPedal;
           jsonController["value"]   = _sustain;
@@ -761,33 +761,33 @@ private:
       }
 
       {
-        JsonObject jsonController = jsonControllers.createNestedObject();
+        JsonObject jsonController = jsonControllers.add<JsonObject>();
         jsonController["name"]    = "Hue";
         jsonController["number"]  = (uint8_t)CC::Color;
         jsonController["value"]   = (uint8_t)(_channels[ch].led.h / 360.f * 127.f);
       }
       {
-        JsonObject jsonController = jsonControllers.createNestedObject();
+        JsonObject jsonController = jsonControllers.add<JsonObject>();
         jsonController["name"]    = "Saturation";
         jsonController["number"]  = (uint8_t)CC::Saturation;
         jsonController["value"]   = (uint8_t)(_channels[ch].led.s * 127.f);
       }
       {
-        JsonObject jsonController = jsonControllers.createNestedObject();
+        JsonObject jsonController = jsonControllers.add<JsonObject>();
         jsonController["name"]    = "Brightness";
         jsonController["number"]  = (uint8_t)CC::Brightness;
         jsonController["value"]   = (uint8_t)(_channels[ch].led.v * 127.f);
       }
 
       if (ch == 0) {
-        JsonObject jsonController = jsonControllers.createNestedObject();
+        JsonObject jsonController = jsonControllers.add<JsonObject>();
         jsonController["name"]    = "Rainbow";
         jsonController["number"]  = (uint8_t)CC::Rainbow;
         jsonController["value"]   = (uint8_t)(_rainbow * 127.f);
       }
 
       {
-        JsonObject jsonChromatic = jsonChannel.createNestedObject("chromatic");
+        JsonObject jsonChromatic = jsonChannel["chromatic"].to<JsonObject>();
         jsonChromatic["start"]   = notes.start;
         jsonChromatic["count"]   = notes.count;
       }
@@ -870,7 +870,7 @@ public:
 } MIDIFile;
 
 void Device::exportSystemMIDIFile(JsonObject json) {
-  JsonObject jsonTrack = json.createNestedObject("track");
+  JsonObject jsonTrack = json["track"].to<JsonObject>();
   char s[128];
   if (MIDIFile.copyTag(V2MIDI::File::Event::Meta::Title, s, sizeof(s)) > 0)
     jsonTrack["title"] = s;
