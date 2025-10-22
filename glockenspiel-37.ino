@@ -10,7 +10,7 @@
 #include <V2MIDI.h>
 #include <V2Music.h>
 
-V2DEVICE_METADATA("com.versioduo.glockenspiel-37", 69, "versioduo:samd:control");
+V2DEVICE_METADATA("com.versioduo.glockenspiel-37", 70, "versioduo:samd:control");
 
 static V2LED::WS2812 LED(2, PIN_LED_WS2812, &sercom2, SPI_PAD_0_SCK_1, PIO_SERCOM);
 static V2LED::WS2812 LEDExt(37, PIN_LED_WS2812_EXT, &sercom1, SPI_PAD_0_SCK_1, PIO_SERCOM);
@@ -313,7 +313,7 @@ private:
     for (uint8_t i = 0; i < 1 + (notes.count / 8); i++) {
       V2MIDI::Packet _midi{};
       _midi.setPort(i);
-      _midi.set(0, V2MIDI::Packet::Status::SystemReset);
+      _midi.setSystem(V2MIDI::Packet::Status::SystemReset);
       Socket.send(&_midi);
     }
   }
