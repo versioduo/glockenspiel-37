@@ -7,7 +7,7 @@
 #include <V2MIDI.h>
 #include <V2Music.h>
 
-V2DEVICE_METADATA("com.versioduo.glockenspiel-37", 70, "versioduo:samd:control");
+V2DEVICE_METADATA("com.versioduo.glockenspiel-37", 71, "versioduo:samd:control");
 
 namespace {
   V2LED::WS2812        LED(2, PIN_LED_WS2812, &sercom2, SPI_PAD_0_SCK_1, PIO_SERCOM);
@@ -379,10 +379,10 @@ namespace {
       static constexpr struct {
         struct {
           float watts{0.8};
-          float seconds{0.06};
+          float seconds{0.025};
         } min;
         struct {
-          float watts{5};
+          float watts{6};
           float seconds{0.01};
         } max;
       } range;
