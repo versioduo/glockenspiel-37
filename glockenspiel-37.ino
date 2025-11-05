@@ -7,7 +7,7 @@
 #include <V2MIDI.h>
 #include <V2Music.h>
 
-V2DEVICE_METADATA("com.versioduo.glockenspiel-37", 71, "versioduo:samd:control");
+V2DEVICE_METADATA("com.versioduo.glockenspiel-37", 72, "versioduo:samd:control");
 
 namespace {
   V2LED::WS2812        LED(2, PIN_LED_WS2812, &sercom2, SPI_PAD_0_SCK_1, PIO_SERCOM);
@@ -551,6 +551,7 @@ namespace {
           return;
 
         case V2MIDI::CC::BankSelectLSB:
+          _channels[channel].bank &= 0xff00;
           _channels[channel].bank |= value;
           return;
 
