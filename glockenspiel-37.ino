@@ -22,13 +22,13 @@ namespace {
       return _mode;
     }
 
-    void setMode(Mode mode, float color = 0) {
+    void setMode(Mode mode, float colour = 0) {
       _mode = mode;
 
       switch (_mode) {
         case Mode::Notes:
           LED.reset();
-          LED.setHSV(color, 1, 0.25);
+          LED.setHSV(colour, 1, 0.25);
           break;
 
         case Mode::Song:
@@ -43,13 +43,13 @@ namespace {
       }
     }
 
-    void setColour(V2Colour::Hue color) {
+    void setColour(V2Colour::Hue colour) {
       LED.reset();
-      LED.setHSV(color, 1, 0.25);
+      LED.setHSV(colour, 1, 0.25);
     }
 
-    void splashColour(V2Colour::Hue color) {
-      LED.splashHSV(0.5, color, 1, 0.25);
+    void splashColour(V2Colour::Hue colour) {
+      LED.splashHSV(0.5, colour, 1, 0.25);
     }
 
   private:
@@ -102,12 +102,12 @@ namespace {
         uint8_t max;
       } calibration[notes.count]{};
 
-      // LED color.
+      // LED colour.
       struct {
         uint8_t h{15};
         uint8_t s{40};
         uint8_t v{100};
-      } color;
+      } colour;
     } config;
 
     enum class Program : uint8_t {
@@ -123,12 +123,12 @@ namespace {
 
       switch (Manual.getMode()) {
         case Manual::Mode::Notes:
-          Manual.setColour(_programs[(uint8_t)_channels[channel].program].color);
+          Manual.setColour(_programs[(uint8_t)_channels[channel].program].colour);
           break;
 
         case Manual::Mode::Song:
         case Manual::Mode::Test:
-          Manual.splashColour(_programs[(uint8_t)_channels[channel].program].color);
+          Manual.splashColour(_programs[(uint8_t)_channels[channel].program].colour);
           break;
       }
     }
@@ -212,19 +212,19 @@ namespace {
 
     const struct {
       const char*   name;
-      V2Colour::Hue color;
+      V2Colour::Hue colour;
     } _programs[(uint8_t)Program::_count]{
-      [(uint8_t)Program::Standard]    = {.name{"Standard"}, .color{V2Colour::Orange}},
-      [(uint8_t)Program::Damper]      = {.name{"Damper"}, .color{V2Colour::Cyan}},
-      [(uint8_t)Program::Dampened]    = {.name{"Dampened"}, .color{V2Colour::Green}},
-      [(uint8_t)Program::Calibration] = {.name{"Calibration"}, .color{V2Colour::Magenta}},
+      [(uint8_t)Program::Standard]    = {.name{"Standard"}, .colour{V2Colour::Orange}},
+      [(uint8_t)Program::Damper]      = {.name{"Damper"}, .colour{V2Colour::Cyan}},
+      [(uint8_t)Program::Dampened]    = {.name{"Dampened"}, .colour{V2Colour::Green}},
+      [(uint8_t)Program::Calibration] = {.name{"Calibration"}, .colour{V2Colour::Magenta}},
     };
 
     struct {
       Program  program{};
       uint16_t bank{};
 
-      // LED color.
+      // LED colour.
       struct {
         float h;
         float s;
@@ -294,12 +294,12 @@ namespace {
         _channels[ch].program = Program::Standard;
         _channels[ch].bank    = 0;
 
-        _channels[ch].led.h = (float)config.color.h / 127.f * 360.f;
-        _channels[ch].led.s = (float)config.color.s / 127.f;
-        _channels[ch].led.v = (float)config.color.v / 127.f;
+        _channels[ch].led.h = (float)config.colour.h / 127.f * 360.f;
+        _channels[ch].led.s = (float)config.colour.s / 127.f;
+        _channels[ch].led.v = (float)config.colour.v / 127.f;
       }
 
-      Manual.setMode(Manual::Mode::Notes, _programs[(uint8_t)_channels[0].program].color);
+      Manual.setMode(Manual::Mode::Notes, _programs[(uint8_t)_channels[0].program].colour);
       resetNotes();
     }
 
@@ -636,9 +636,9 @@ namespace {
 
       {
         JsonObject setting = json.add<JsonObject>();
-        setting["type"]    = "color";
+        setting["type"]    = "colour";
         setting["title"]   = "Light";
-        setting["path"]    = "color";
+        setting["path"]    = "colour";
       }
     }
 
@@ -662,11 +662,11 @@ namespace {
       }
 
       {
-        json["#color"]    = "The LED color. Hue, saturation, brightness, 0..127";
-        JsonArray jsonLed = json["color"].to<JsonArray>();
-        jsonLed.add(config.color.h);
-        jsonLed.add(config.color.s);
-        jsonLed.add(config.color.v);
+        json["#colour"]   = "The LED colour. Hue, saturation, brightness, 0..127";
+        JsonArray jsonLed = json["colour"].to<JsonArray>();
+        jsonLed.add(config.colour.h);
+        jsonLed.add(config.colour.s);
+        jsonLed.add(config.colour.v);
       }
     }
 
@@ -705,24 +705,24 @@ namespace {
         }
       }
 
-      JsonArray jsonLed = json["color"];
+      JsonArray jsonLed = json["colour"];
       if (jsonLed) {
-        uint8_t color = jsonLed[0];
-        if (color > 127)
-          color = 127;
-        config.color.h     = color;
-        _channels[0].led.h = (float)color / 127.f * 360.f;
+        uint8_t colour = jsonLed[0];
+        if (colour > 127)
+          colour = 127;
+        config.colour.h    = colour;
+        _channels[0].led.h = (float)colour / 127.f * 360.f;
 
         uint8_t saturation = jsonLed[1];
         if (saturation > 127)
           saturation = 127;
-        config.color.s     = saturation;
+        config.colour.s    = saturation;
         _channels[0].led.s = (float)saturation / 127.f;
 
         uint8_t brightness = jsonLed[2];
         if (brightness > 127)
           brightness = 127;
-        config.color.v     = brightness;
+        config.colour.v    = brightness;
         _channels[0].led.v = (float)brightness / 127.f;
       }
     }
