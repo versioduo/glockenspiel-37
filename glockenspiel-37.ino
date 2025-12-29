@@ -1,6 +1,5 @@
 #include "MIDISong.h"
 #include <V2Buttons.h>
-#include <V2Color.h>
 #include <V2Device.h>
 #include <V2LED.h>
 #include <V2Link.h>
@@ -44,12 +43,12 @@ namespace {
       }
     }
 
-    void setColor(V2Color::Hue color) {
+    void setColour(V2Colour::Hue color) {
       LED.reset();
       LED.setHSV(color, 1, 0.25);
     }
 
-    void splashColor(V2Color::Hue color) {
+    void splashColour(V2Colour::Hue color) {
       LED.splashHSV(0.5, color, 1, 0.25);
     }
 
@@ -82,7 +81,7 @@ namespace {
     enum class CC {
       Volume       = V2MIDI::CC::ChannelVolume,
       SustainPedal = V2MIDI::CC::SustainPedal,
-      Color        = V2MIDI::CC::Controller14,
+      Colour       = V2MIDI::CC::Controller14,
       Saturation   = V2MIDI::CC::Controller15,
       Brightness   = V2MIDI::CC::Controller89,
       Rainbow      = V2MIDI::CC::Controller90,
@@ -124,12 +123,12 @@ namespace {
 
       switch (Manual.getMode()) {
         case Manual::Mode::Notes:
-          Manual.setColor(_programs[(uint8_t)_channels[channel].program].color);
+          Manual.setColour(_programs[(uint8_t)_channels[channel].program].color);
           break;
 
         case Manual::Mode::Song:
         case Manual::Mode::Test:
-          Manual.splashColor(_programs[(uint8_t)_channels[channel].program].color);
+          Manual.splashColour(_programs[(uint8_t)_channels[channel].program].color);
           break;
       }
     }
@@ -212,13 +211,13 @@ namespace {
     float                 _rainbow{};
 
     const struct {
-      const char*  name;
-      V2Color::Hue color;
+      const char*   name;
+      V2Colour::Hue color;
     } _programs[(uint8_t)Program::_count]{
-      [(uint8_t)Program::Standard]    = {.name{"Standard"}, .color{V2Color::Orange}},
-      [(uint8_t)Program::Damper]      = {.name{"Damper"}, .color{V2Color::Cyan}},
-      [(uint8_t)Program::Dampened]    = {.name{"Dampened"}, .color{V2Color::Green}},
-      [(uint8_t)Program::Calibration] = {.name{"Calibration"}, .color{V2Color::Magenta}},
+      [(uint8_t)Program::Standard]    = {.name{"Standard"}, .color{V2Colour::Orange}},
+      [(uint8_t)Program::Damper]      = {.name{"Damper"}, .color{V2Colour::Cyan}},
+      [(uint8_t)Program::Dampened]    = {.name{"Dampened"}, .color{V2Colour::Green}},
+      [(uint8_t)Program::Calibration] = {.name{"Calibration"}, .color{V2Colour::Magenta}},
     };
 
     struct {
@@ -570,7 +569,7 @@ namespace {
           setSustain(value);
           return;
 
-        case (uint8_t)CC::Color:
+        case (uint8_t)CC::Colour:
           _channels[channel].led.h = (float)value / 127.f * 360.f;
           break;
 
@@ -763,7 +762,7 @@ namespace {
         {
           JsonObject jsonController = jsonControllers.add<JsonObject>();
           jsonController["name"]    = "Hue";
-          jsonController["number"]  = (uint8_t)CC::Color;
+          jsonController["number"]  = (uint8_t)CC::Colour;
           jsonController["value"]   = (uint8_t)(_channels[ch].led.h / 360.f * 127.f);
         }
         {
