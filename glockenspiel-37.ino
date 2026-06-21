@@ -840,7 +840,7 @@ namespace {
           return;
 
         if (Device.usb.midi.connected()) {
-          if (!packet->receive(&_midi))
+          if (!packet->copyTo(_midi))
             return;
 
           _midi.setPort(address + 1);
