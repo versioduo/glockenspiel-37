@@ -6,11 +6,11 @@
 #include <V2MIDI.h>
 #include <V2Music.h>
 
-V2DEVICE_METADATA("com.versioduo.glockenspiel-37", 73, "versioduo:samd:control");
+V2DEVICE_METADATA("com.versioduo.glockenspiel-37", 74, "versioduo:samd:control");
 
 namespace {
-  V2LED::WS2812        LED(2, PIN_LED_WS2812, &sercom2, SPI_PAD_0_SCK_1, PIO_SERCOM);
-  V2LED::WS2812        LEDExt(37, PIN_LED_WS2812_EXT, &sercom1, SPI_PAD_0_SCK_1, PIO_SERCOM);
+  V2LED::WS2812<2>     LED(PIN_LED_WS2812, sercom2, SPI_PAD_0_SCK_1, PIO_SERCOM);
+  V2LED::WS2812<37>    LEDExt(PIN_LED_WS2812_EXT, sercom1, SPI_PAD_0_SCK_1, PIO_SERCOM);
   V2MIDI::SerialDevice MIDISerial(&SerialMIDI);
   V2Link::Port         Socket(&SerialSocket, PIN_SERIAL_SOCKET_TX_ENABLE);
 
@@ -28,12 +28,12 @@ namespace {
       switch (_mode) {
         case Mode::Notes:
           LED.reset();
-          LED.setHSV(colour, 1, 0.25);
+          LED.hsv({colour, 1, 0.25});
           break;
 
         case Mode::Song:
           LED.reset();
-          LED.setBrightness(0.25);
+          LED.brightness(0.25);
           break;
 
         case Mode::Test:
@@ -43,13 +43,13 @@ namespace {
       }
     }
 
-    void setColour(V2Colour::Hue colour) {
+    void setColour(float colour) {
       LED.reset();
-      LED.setHSV(colour, 1, 0.25);
+      LED.hsv({colour, 1, 0.25});
     }
 
-    void splashColour(V2Colour::Hue colour) {
-      LED.splashHSV(0.5, colour, 1, 0.25);
+    void flashColour(float colour) {
+      LED.flash({colour, 1, 0.25}, 0.5);
     }
 
   private:
@@ -128,7 +128,7 @@ namespace {
 
         case Manual::Mode::Song:
         case Manual::Mode::Test:
-          Manual.splashColour(_programs[(uint8_t)_channels[channel].program].colour);
+          Manual.flashColour(_programs[(uint8_t)_channels[channel].program].colour);
           break;
       }
     }
@@ -211,8 +211,8 @@ namespace {
     float                 _rainbow{};
 
     const struct {
-      const char*   name;
-      V2Colour::Hue colour;
+      const char* name;
+      float       colour;
     } _programs[(uint8_t)Program::_count]{
       [(uint8_t)Program::Standard]    = {.name{"Standard"}, .colour{V2Colour::Orange}},
       [(uint8_t)Program::Damper]      = {.name{"Damper"}, .colour{V2Colour::Cyan}},
@@ -241,7 +241,6 @@ namespace {
 
     void handleInit() override {
       if (usb.ports.enableAccess) {
-        usb.midi.setPortName(1, "control");
         usb.midi.setPortName(2, "pulse 1");
         usb.midi.setPortName(3, "pulse 2");
         usb.midi.setPortName(4, "pulse 3");
@@ -322,11 +321,11 @@ namespace {
     void light(uint8_t channel, uint8_t note, float fraction) {
       if (fraction > 0.f) {
         const float brightness = 0.2f + (0.8f * fraction);
-        LEDExt.setHSV(note, _channels[channel].led.h, _channels[channel].led.s, _channels[channel].led.v * brightness);
+        LEDExt.hsv({_channels[channel].led.h, _channels[channel].led.s, _channels[channel].led.v * brightness}, note);
         led.flash(0.03, 0.3);
 
       } else {
-        LEDExt.setBrightness(note, 0);
+        LEDExt.brightness(0, note);
       }
     }
 
@@ -985,10 +984,10 @@ auto setup() -> void {
   Serial.begin(9600);
 
   LED.begin();
-  LED.setMaxBrightness(0.5);
+  LED.brightnessMax(0.5);
   LEDExt.begin();
-  LEDExt.setDirection(true);
-  LEDExt.setMaxBrightness(0.75);
+  LEDExt.reverse(true);
+  LEDExt.brightnessMax(0.75);
   Device.begin();
 
   for (uint8_t i{}; i < V2Base::countof(Buttons); i++)
