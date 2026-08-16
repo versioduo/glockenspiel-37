@@ -6,13 +6,13 @@
 #include <V2MIDI.h>
 #include <V2Music.h>
 
-V2DEVICE_METADATA("com.versioduo.glockenspiel-37", 74, "versioduo:samd:control");
+V2DEVICE_METADATA("com.versioduo.glockenspiel-37", 75, "versioduo:samd:control");
 
 namespace {
   V2LED::WS2812<2>     LED(PIN_LED_WS2812, sercom2, SPI_PAD_0_SCK_1, PIO_SERCOM);
   V2LED::WS2812<37>    LEDExt(PIN_LED_WS2812_EXT, sercom1, SPI_PAD_0_SCK_1, PIO_SERCOM);
-  V2MIDI::SerialDevice MIDISerial(&SerialMIDI);
-  V2Link::Port         Socket(&SerialSocket, PIN_SERIAL_SOCKET_TX_ENABLE);
+  V2Link::Port         Socket(&SerialSocket, PIN_SERIAL_SOCKET_TX_ENABLE, "port");
+  V2MIDI::SerialDevice MIDISerial(&SerialMIDI, "serial");
 
   // The button switches the state with a multi-click long-press.
   class Manual {
@@ -999,7 +999,8 @@ auto setup() -> void {
   setSerialPriority(&SerialSocket, 2);
 
   MIDISerial.begin();
-  Device.serial = &MIDISerial;
+  Device.ports.push_back(&MIDISerial);
+
   Device.reset();
 }
 
