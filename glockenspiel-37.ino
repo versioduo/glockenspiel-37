@@ -6,9 +6,8 @@
 #include <V2MIDI.h>
 #include <V2Music.h>
 
-V2DEVICE_METADATA("com.versioduo.glockenspiel-37", 75, "versioduo:samd:control");
-
 namespace {
+  V2Device::Info       Info{V2DeviceInfo("com.versioduo.glockenspiel-37", 75, "versioduo:samd:control")};
   V2LED::WS2812<2>     LED(PIN_LED_WS2812, sercom2, SPI_PAD_0_SCK_1, PIO_SERCOM);
   V2LED::WS2812<37>    LEDExt(PIN_LED_WS2812_EXT, sercom1, SPI_PAD_0_SCK_1, PIO_SERCOM);
   V2Link::Port         Socket(&SerialSocket, PIN_SERIAL_SOCKET_TX_ENABLE, "port");
@@ -63,19 +62,13 @@ namespace {
       metadata.product     = "V2 glockenspiel-37";
       metadata.description = "37 Bar Glockenspiel";
       metadata.home        = "https://versioduo.com/#glockenspiel-37";
-
-      help.device = "Notes are controlled by a trigger and a damper, it allows a piano-like "
-                    "velocity and tone duration control; MIDI Note-Off will cause the currently "
-                    "playing tone to be damped.";
-
-      system.download  = "https://versioduo.com/download";
-      system.configure = "https://versioduo.com/configure";
-
-      // https://github.com/versioduo/arduino-board-package/blob/main/boards.txt
-      usb.pid          = 0xe910;
-      usb.ports.access = 6;
-
-      configuration = {.size{sizeof(config)}, .data{&config}};
+      help.device          = "Notes are controlled by a trigger and a damper, it allows a piano-like velocity and tone "
+                             "duration control; MIDI Note-Off will cause the currently playing tone to be damped.";
+      system.download      = "https://versioduo.com/download";
+      system.configure     = "https://versioduo.com/configure";
+      usb.pid              = 0xe910; // https://github.com/versioduo/arduino-board-package/blob/main/boards.txt
+      usb.ports.access     = 6;
+      configuration        = {.size{sizeof(config)}, .data{&config}};
     }
 
     enum class CC {
