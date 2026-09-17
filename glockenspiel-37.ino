@@ -7,7 +7,7 @@
 #include <V2Music.h>
 
 namespace {
-  V2Device::Info       Info{V2DeviceInfo("com.versioduo.glockenspiel-37", 75, "versioduo:samd:control")};
+  V2Device::Info       Info{V2DeviceInfo("com.versioduo.glockenspiel-37", 76, "versioduo:samd:control")};
   V2LED::WS2812<2>     LED(PIN_LED_WS2812, sercom2, SPI_PAD_0_SCK_1, PIO_SERCOM);
   V2LED::WS2812<37>    LEDExt(PIN_LED_WS2812_EXT, sercom1, SPI_PAD_0_SCK_1, PIO_SERCOM);
   V2Link::Port         Socket(&SerialSocket, PIN_SERIAL_SOCKET_TX_ENABLE, "port");
@@ -362,6 +362,7 @@ namespace {
         .fadeIn{fadeIn},
         .fadeOut{fadeOut},
       });
+      p.address = child;
       Socket.send(p);
     }
 
